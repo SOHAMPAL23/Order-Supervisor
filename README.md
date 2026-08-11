@@ -6,88 +6,151 @@
 
 ## 🌟 Overview
 
-The **Order Supervisor** is an enterprise-grade AI Operations Platform designed to manage, monitor, and govern e-commerce order lifecycles over long durations (days to weeks). 
+The **Order Supervisor** is an enterprise-grade AI Operations Platform designed to manage, monitor, and govern e-commerce order lifecycles over long durations (days to weeks).
 
-Unlike short-lived chat agents, Order Supervisor runs **Durable AI Workflows** via Temporal.io. Each order is paired with an autonomous AI Supervisor that evaluates order events, triggers external actions (e.g., messaging logistics, notifying customers, creating internal notes), and dynamically sleeps or wakes up based on domain-specific policies.
+Unlike traditional short-lived chat agents, Order Supervisor runs **Durable AI Workflows** via Temporal.io. Each order is paired with an autonomous AI Supervisor that evaluates order events, triggers external actions (messaging logistics, notifying customers, creating notes), and dynamically sleeps or wakes up based on domain-specific policies.
 
 ---
 
 ## 📐 System Architecture
 
+### Component Hierarchy
+
 ```mermaid
-flowchart TB
-    subgraph Frontend ["Frontend (Next.js 15 Console)"]
-        UI["Modern AI Operations Console"]
-        Dashboard["Dashboard & Analytics"]
-        RunsView["Active & Completed Runs"]
-        Simulator["Event & Instruction Simulator"]
+flowchart LR
+    %% Styles & Color Definitions
+    classDef client fill:#1e1b4b,stroke:#6366f1,stroke-width:2px,color:#e0e7ff;
+    classDef api fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#d1fae5;
+    classDef store fill:#701a75,stroke:#d946ef,stroke-width:2px,color:#fdf4ff;
+    classDef temporal fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#e0f2fe;
+    classDef ai fill:#312e81,stroke:#818cf8,stroke-width:2px,color:#e0e7ff;
+
+    subgraph L1["🎨 User Interface Layer"]
+        UI["Modern Operations Console<br/><i>(Next.js 15 + Tailwind)</i>"]:::client
+        Simulator["Event & Instruction Simulator"]:::client
     end
 
-    subgraph Backend ["Backend API (FastAPI)"]
-        Router["REST API Routes (/api/supervisors, /api/runs)"]
-        ORM["SQLAlchemy (Asyncpg)"]
-        TemporalClient["Temporal SDK Client"]
+    subgraph L2["⚡ API & Control Layer"]
+        API["FastAPI Application Server<br/><i>(Python 3.11)</i>"]:::api
     end
 
-    subgraph Storage ["Persistence Layer"]
-        PG[("PostgreSQL Database")]
+    subgraph L3["⚙️ Core Infrastructure"]
+        PG[("PostgreSQL 16<br/><i>State & Activity Logs</i>")]:::store
+        Temporal["Temporal.io Server<br/><i>Workflow Orchestration</i>"]:::temporal
     end
 
-    subgraph Orchestration ["Temporal.io Workflow Engine"]
-        WF["OrderSupervisorWorkflow"]
-        Worker["Temporal Worker Process"]
+    subgraph L4["🧠 Intelligence & Execution Layer"]
+        Worker["Temporal Worker Process"]:::temporal
+        LLM["OpenAI GPT-4o Engine<br/><i>(Fallback Engine Supported)</i>"]:::ai
     end
 
-    subgraph Intelligence ["AI Agent Engine"]
-        LLM["OpenAI GPT-4o / Fallback Provider"]
-        Memory["Compact Memory & Learning Engine"]
-    end
+    %% Flow Connections
+    UI -->|"REST API Calls"| API
+    Simulator -->|"Inject Signals"| API
+    API -->|"Async ORM"| PG
+    API -->|"Start / Signal Workflows"| Temporal
+    Temporal <-->|"Task Queue Polling"| Worker
+    Worker -->|"LLM Invocations"| LLM
+    Worker -->|"Persist Activity Logs"| PG
+```
 
-    UI --> Router
-    Simulator --> Router
-    Router --> ORM --> PG
-    Router --> TemporalClient --> WF
-    Worker <--> WF
-    Worker --> LLM
-    Worker --> ORM
+---
+
+## 🔁 Event Processing & Execution Flow
+
+The sequence diagram below shows how an order event or instruction flows end-to-end through the system:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Operator as 👤 Operator / Webhook
+    participant API as ⚡ FastAPI Backend
+    participant DB as 🗄️ PostgreSQL DB
+    participant Engine as ⚙️ Temporal Engine
+    participant Worker as 🤖 Temporal Worker
+    participant LLM as 🧠 OpenAI GPT-4o
+
+    Operator->>API: Inject Event (e.g. PAYMENT_FAILED)
+    API->>DB: Log Injected Event Activity
+    API->>Engine: Signal Workflow ("order_event")
+    
+    note over Engine,Worker: Workflow wakes up from SLEEPING state
+    Engine->>Worker: Dispatch Task to Worker
+    Worker->>DB: Fetch Order Context & Activity History
+    Worker->>LLM: Evaluate Prompt & Context
+    LLM-->>Worker: Decision (ACT / SLEEP / COMPLETE) + Actions
+    
+    alt Agent Decision == ACT
+        Worker->>DB: Record Executed Actions (e.g. Notify Customer)
+        Worker->>Engine: Schedule Timer & Transition to SLEEPING
+    else Agent Decision == COMPLETE
+        Worker->>DB: Save Final Learnings & Summary
+        Worker->>Engine: Transition to COMPLETED
+    end
 ```
 
 ---
 
 ## 🔄 Workflow State Machine & Lifecycle
 
-Every order execution follows a strict, durable state machine:
+Every order execution follows a strict, durable state machine governed by Temporal:
 
 ```mermaid
 stateDiagram-v2
+    classDef activeState fill:#065f46,stroke:#34d399,color:#ecfdf5;
+    classDef sleepState fill:#1e1b4b,stroke:#818cf8,color:#e0e7ff;
+    classDef termState fill:#881337,stroke:#fda4af,color:#fff1f2;
+
     [*] --> STARTING
     STARTING --> ACTIVE : Workflow Initialized
     STARTING --> START_FAILED : Connection Error
     
-    ACTIVE --> SLEEPING : No Immediate Action Required
-    ACTIVE --> PAUSED : Manual Pause Signal
-    ACTIVE --> INTERRUPTED : Manual Interrupt Signal
-    ACTIVE --> COMPLETING : Terminal Event (e.g. DELIVERED)
+    ACTIVE --> SLEEPING : No Immediate Action Needed
+    ACTIVE --> PAUSED : Operator Pause Signal
+    ACTIVE --> INTERRUPTED : Operator Interrupt Signal
+    ACTIVE --> COMPLETING : Terminal Event (DELIVERED)
     
-    SLEEPING --> ACTIVE : Incoming Signal (Event / Instruction)
+    SLEEPING --> ACTIVE : Incoming Event / Instruction Signal
     SLEEPING --> ACTIVE : Scheduled Timer Wakeup
     
     PAUSED --> ACTIVE : Resume Signal
     INTERRUPTED --> ACTIVE : Resume Signal
     
-    COMPLETING --> COMPLETED : Final Summaries & Learnings Generated
+    COMPLETING --> COMPLETED : Final Summaries Generated
+    
     COMPLETED --> [*]
     TERMINATED --> [*]
+    START_FAILED --> [*]
+
+    class ACTIVE activeState;
+    class SLEEPING sleepState;
+    class TERMINATED,START_FAILED termState;
 ```
 
-### Key Workflow States:
-- **`STARTING`**: Initializing run and starting Temporal workflow.
-- **`ACTIVE`**: Agent is currently analyzing context, executing LLM decisions, or performing actions.
-- **`SLEEPING`**: Workflow is in a low-resource durable timer wait state until a new signal arrives or a scheduled wake time occurs.
-- **`PAUSED` / `INTERRUPTED`**: Workflow state suspended via human operator control.
-- **`COMPLETING`**: Terminal trigger received; compiling final learnings, recommendations, and execution summary.
-- **`COMPLETED`**: Workflow execution successfully finished.
-- **`TERMINATED`**: Workflow manually aborted by operator.
+---
+
+## 🧩 Architectural Breakdown
+
+### 1. User Interface Layer (`/frontend`)
+- **Next.js 15 Console**: A modern dark-themed dashboard providing real-time visibility into supervisor runs.
+- **Interactive Controls**: Allows operators to pause, resume, interrupt, or terminate workflows.
+- **Event Simulator**: Enables 1-click simulation of e-commerce order lifecycle webhooks (`PAYMENT_FAILED`, `SHIPMENT_DELAYED`, `DELIVERED`).
+
+### 2. API & Control Layer (`/backend/app/api`)
+- **FastAPI REST API**: High-performance asynchronous routes for managing supervisors, launching workflow runs, and sending signals.
+- **Auto-Synchronization**: Automatically detects when a workflow completes in Temporal and synchronizes the PostgreSQL state.
+
+### 3. Persistence Layer (`/backend/app/db`)
+- **PostgreSQL 16**: Relational storage for supervisor configurations, run states, activity logs, and compact memories.
+- **SQLAlchemy 2.0 (Asyncpg)**: Asynchronous ORM providing audit logging and execution timelines.
+
+### 4. Orchestration Engine (`/backend/app/temporal`)
+- **Temporal.io Workflows**: Guarantees fault tolerance and state persistence across restarts, crashes, or network interruptions.
+- **Durable Timers**: Allows agents to sleep for long durations without consuming server CPU or memory.
+
+### 5. Intelligence Engine (`/backend/app/agent`)
+- **OpenAI GPT-4o Engine**: Evaluates contextual prompts to decide next actions.
+- **Fallback Engine**: Intelligent rule-based fallback provider used when API keys are absent, ensuring offline usability.
 
 ---
 
@@ -95,7 +158,7 @@ stateDiagram-v2
 
 | Domain | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Frontend** | Next.js 15, TypeScript, Tailwind CSS, Lucide React | Modern dark-themed AI Operations Console UI |
+| **Frontend** | Next.js 15, TypeScript, Tailwind CSS, Lucide React | Dark-themed AI Operations Console UI |
 | **Backend API** | FastAPI, Python 3.11+, Pydantic v2 | High-performance asynchronous REST API |
 | **Orchestration**| Temporal.io (Python SDK) | Fault-tolerant durable workflow & timer engine |
 | **Database** | PostgreSQL 16, SQLAlchemy 2.0 (Asyncpg) | State storage, run history & audit logs |
