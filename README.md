@@ -11,6 +11,10 @@ The **Order Supervisor** is an enterprise-grade AI Operations Platform designed 
 Unlike traditional short-lived chat agents, Order Supervisor runs **Durable AI Workflows** via Temporal.io. Each order is paired with an autonomous AI Supervisor that evaluates order events, triggers external actions (messaging logistics, notifying customers, creating notes), and dynamically sleeps or wakes up based on domain-specific policies.
 
 ---
+## 🌟 Overview
+https://drive.google.com/file/d/15HB5TxwaFGVSRn8HLX1nw-GPe1Yr-4iV/view?usp=sharing
+
+---
 
 ## 📐 System Architecture
 
