@@ -110,10 +110,28 @@ export default function DashboardPage() {
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
 
+  const isFirstTimeUser = runs.length === 0 && !loading;
+
   return (
     <>
       <TopBar onRefresh={() => loadRuns(true)} isRefreshing={refreshing} />
       <div className="flex-1 p-6 space-y-6">
+        
+        {isFirstTimeUser && (
+          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-6 relative overflow-hidden">
+            <div className="absolute right-0 top-0 w-64 h-64 bg-indigo-500/10 blur-3xl rounded-full transform translate-x-1/2 -translate-y-1/2" />
+            <h2 className="text-xl font-bold text-indigo-300 mb-2">Welcome to Order Supervisor 👋</h2>
+            <p className="text-indigo-200/80 max-w-2xl text-sm leading-relaxed mb-4">
+              This is a durable AI Operations platform. To get started, you can spawn a new <b>AI Agent</b> to supervise an order. 
+              The agent will durably monitor the order, wait for events, and take intelligent actions.
+            </p>
+            <Link href="/runs/new">
+              <Button variant="primary" icon={<Plus className="w-4 h-4" />}>
+                Spawn Your First Agent
+              </Button>
+            </Link>
+          </div>
+        )}
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
@@ -227,43 +245,33 @@ export default function DashboardPage() {
         </div>
 
         {/* Workflow flow explanation */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-4">
-            How It Works
+        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6">
+          <h3 className="text-sm font-bold text-zinc-300 mb-4 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-indigo-400" />
+            How the Durable AI Supervisor Works
           </h3>
-          <div className="flex items-center gap-2 flex-wrap">
-            {[
-              { label: "EVENT", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-              { label: "↓", color: "text-zinc-600" },
-              { label: "WAKE POLICY", color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
-              { label: "↓", color: "text-zinc-600" },
-              { label: "AGENT", color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
-              { label: "↓", color: "text-zinc-600" },
-              { label: "ACTION", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-              { label: "↓", color: "text-zinc-600" },
-              { label: "MEMORY", color: "text-teal-400 bg-teal-500/10 border-teal-500/20" },
-              { label: "↓", color: "text-zinc-600" },
-              { label: "SLEEP", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
-              { label: "↓", color: "text-zinc-600" },
-              { label: "NEXT EVENT", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-            ].map((item, i) =>
-              item.label === "↓" ? (
-                <span key={i} className="text-zinc-600 text-sm">
-                  {item.label}
-                </span>
-              ) : (
-                <span
-                  key={i}
-                  className={`px-2.5 py-1 rounded-lg border text-xs font-mono font-semibold ${item.color}`}
-                >
-                  {item.label}
-                </span>
-              )
-            )}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              <div className="text-xs font-semibold text-amber-400 mb-1">1. Event Occurs</div>
+              <p className="text-xs text-zinc-500">A webhook triggers an event like Payment Failed or Shipment Delayed.</p>
+            </div>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              <div className="text-xs font-semibold text-blue-400 mb-1">2. Agent Wakes Up</div>
+              <p className="text-xs text-zinc-500">The Temporal workflow durably wakes up without losing state.</p>
+            </div>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              <div className="text-xs font-semibold text-violet-400 mb-1">3. AI Evaluation</div>
+              <p className="text-xs text-zinc-500">GPT-4o analyzes the event and context to determine the best action.</p>
+            </div>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              <div className="text-xs font-semibold text-emerald-400 mb-1">4. Action Taken</div>
+              <p className="text-xs text-zinc-500">The agent executes the decision (e.g. emails customer, logs memory).</p>
+            </div>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+              <div className="text-xs font-semibold text-indigo-400 mb-1">5. Sleep Durably</div>
+              <p className="text-xs text-zinc-500">The agent goes back to sleep, consuming 0 CPU, awaiting the next event.</p>
+            </div>
           </div>
-          <p className="text-xs text-zinc-600 mt-3">
-            The Temporal workflow runs durably in the background. This console observes and controls the workflow — it never simulates state.
-          </p>
         </div>
       </div>
     </>

@@ -14,78 +14,39 @@ Unlike traditional short-lived chat agents, Order Supervisor runs **Durable AI W
 
 ## 📐 System Architecture
 
-### Component Hierarchy
+### Component Architecture
 
-```mermaid
-flowchart LR
-    %% Styles & Color Definitions
-    classDef client fill:#1e1b4b,stroke:#6366f1,stroke-width:2px,color:#e0e7ff;
-    classDef api fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#d1fae5;
-    classDef store fill:#701a75,stroke:#d946ef,stroke-width:2px,color:#fdf4ff;
-    classDef temporal fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#e0f2fe;
-    classDef ai fill:#312e81,stroke:#818cf8,stroke-width:2px,color:#e0e7ff;
+The Order Supervisor is divided into distinct, easily understandable layers:
 
-    subgraph L1["🎨 User Interface Layer"]
-        UI["Modern Operations Console<br/><i>(Next.js 15 + Tailwind)</i>"]:::client
-        Simulator["Event & Instruction Simulator"]:::client
-    end
-
-    subgraph L2["⚡ API & Control Layer"]
-        API["FastAPI Application Server<br/><i>(Python 3.11)</i>"]:::api
-    end
-
-    subgraph L3["⚙️ Core Infrastructure"]
-        PG[("PostgreSQL 16<br/><i>State & Activity Logs</i>")]:::store
-        Temporal["Temporal.io Server<br/><i>Workflow Orchestration</i>"]:::temporal
-    end
-
-    subgraph L4["🧠 Intelligence & Execution Layer"]
-        Worker["Temporal Worker Process"]:::temporal
-        LLM["OpenAI GPT-4o Engine<br/><i>(Fallback Engine Supported)</i>"]:::ai
-    end
-
-    %% Flow Connections
-    UI -->|"REST API Calls"| API
-    Simulator -->|"Inject Signals"| API
-    API -->|"Async ORM"| PG
-    API -->|"Start / Signal Workflows"| Temporal
-    Temporal <-->|"Task Queue Polling"| Worker
-    Worker -->|"LLM Invocations"| LLM
-    Worker -->|"Persist Activity Logs"| PG
-```
+1. **🎨 User Interface (Next.js 15)**: The dashboard where operators monitor orders, view logs, and manually inject events or instructions.
+2. **⚡ API Layer (FastAPI)**: A high-performance Python server that receives commands from the UI and translates them into Temporal workflow signals.
+3. **⚙️ Orchestration (Temporal.io)**: The durable engine that guarantees workflows never lose state, even if the server crashes or the workflow sleeps for days.
+4. **🧠 Intelligence (GPT-4o)**: The Temporal worker calls the LLM to make intelligent decisions based on the order's state and history.
+5. **🗄️ Persistence (PostgreSQL)**: Stores the audit logs, compact memories, and supervisor configurations.
 
 ---
 
-## 🔁 Event Processing & Execution Flow
+## 🔁 Event Processing & Execution Sequence
 
 The sequence diagram below shows how an order event or instruction flows end-to-end through the system:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Operator as 👤 Operator / Webhook
-    participant API as ⚡ FastAPI Backend
-    participant DB as 🗄️ PostgreSQL DB
+    participant UI as 🎨 Operations Console
     participant Engine as ⚙️ Temporal Engine
-    participant Worker as 🤖 Temporal Worker
-    participant LLM as 🧠 OpenAI GPT-4o
+    participant Worker as 🤖 AI Worker (GPT-4o)
 
-    Operator->>API: Inject Event (e.g. PAYMENT_FAILED)
-    API->>DB: Log Injected Event Activity
-    API->>Engine: Signal Workflow ("order_event")
-    
+    UI->>Engine: 1. Inject Event (e.g. PAYMENT_FAILED)
     note over Engine,Worker: Workflow wakes up from SLEEPING state
-    Engine->>Worker: Dispatch Task to Worker
-    Worker->>DB: Fetch Order Context & Activity History
-    Worker->>LLM: Evaluate Prompt & Context
-    LLM-->>Worker: Decision (ACT / SLEEP / COMPLETE) + Actions
+    Engine->>Worker: 2. Dispatch Task
+    Worker->>Worker: 3. Evaluate Context & Determine Action
     
-    alt Agent Decision == ACT
-        Worker->>DB: Record Executed Actions (e.g. Notify Customer)
-        Worker->>Engine: Schedule Timer & Transition to SLEEPING
-    else Agent Decision == COMPLETE
-        Worker->>DB: Save Final Learnings & Summary
-        Worker->>Engine: Transition to COMPLETED
+    alt Action Required
+        Worker->>UI: 4. Execute Action (e.g. Notify Customer)
+        Worker->>Engine: 5. Transition to SLEEPING
+    else Process Complete
+        Worker->>Engine: 4. Transition to COMPLETED
     end
 ```
 
@@ -96,36 +57,33 @@ sequenceDiagram
 Every order execution follows a strict, durable state machine governed by Temporal:
 
 ```mermaid
-stateDiagram-v2
-    classDef activeState fill:#065f46,stroke:#34d399,color:#ecfdf5;
-    classDef sleepState fill:#1e1b4b,stroke:#818cf8,color:#e0e7ff;
-    classDef termState fill:#881337,stroke:#fda4af,color:#fff1f2;
-
-    [*] --> STARTING
-    STARTING --> ACTIVE : Workflow Initialized
-    STARTING --> START_FAILED : Connection Error
+flowchart LR
+    Start([🚀 Start]) --> Active[⚡ ACTIVE]
+    Active --> Sleeping[💤 SLEEPING]
+    Sleeping --> Active
     
-    ACTIVE --> SLEEPING : No Immediate Action Needed
-    ACTIVE --> PAUSED : Operator Pause Signal
-    ACTIVE --> INTERRUPTED : Operator Interrupt Signal
-    ACTIVE --> COMPLETING : Terminal Event (DELIVERED)
+    Active --> Paused[⏸️ PAUSED]
+    Paused --> Active
     
-    SLEEPING --> ACTIVE : Incoming Event / Instruction Signal
-    SLEEPING --> ACTIVE : Scheduled Timer Wakeup
+    Active --> Completing[🏁 COMPLETING]
+    Completing --> Completed[✅ COMPLETED]
     
-    PAUSED --> ACTIVE : Resume Signal
-    INTERRUPTED --> ACTIVE : Resume Signal
-    
-    COMPLETING --> COMPLETED : Final Summaries Generated
-    
-    COMPLETED --> [*]
-    TERMINATED --> [*]
-    START_FAILED --> [*]
-
-    class ACTIVE activeState;
-    class SLEEPING sleepState;
-    class TERMINATED,START_FAILED termState;
+    Active --> Terminated[⏹️ TERMINATED]
 ```
+
+### State Breakdown Table
+
+| State | Type | Description |
+| :--- | :--- | :--- |
+| **`STARTING`** | Transient | Initializing run and connecting to Temporal workflow engine. |
+| **`ACTIVE`** | Execution | AI Agent is currently analyzing events, executing LLM decisions, or recording activity. |
+| **`SLEEPING`** | Wait State | Workflow is durably waiting for external signals or a timer, consuming 0 CPU resources. |
+| **`PAUSED`** | Suspended | Execution manually paused by an operator. |
+| **`INTERRUPTED`** | Suspended | Execution manually interrupted due to an alert or rule. |
+| **`COMPLETING`** | Finalizing | Terminal event received; compiling final learnings and recommendations. |
+| **`COMPLETED`** | Terminal | Order supervision lifecycle successfully finished. |
+| **`TERMINATED`** | Terminal | Order workflow manually aborted by operator. |
+| **`START_FAILED`**| Error | Failed to start Temporal workflow connection on initialization. |
 
 ---
 
