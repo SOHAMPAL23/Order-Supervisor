@@ -68,7 +68,7 @@ export default function RunsPage() {
       <div className="flex-1 p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-200">Active Runs</h2>
+            <h2 className="text-sm font-semibold text-zinc-200">Ongoing Runs</h2>
             <p className="text-xs text-zinc-500 mt-0.5">
               {activeRuns.length} run{activeRuns.length !== 1 ? "s" : ""} in progress
             </p>
@@ -137,7 +137,7 @@ export default function RunsPage() {
               icon={<Play className="w-5 h-5" />}
               title={
                 activeRuns.length === 0
-                  ? "No active runs"
+                  ? "No ongoing runs"
                   : "No runs match your search"
               }
               description={

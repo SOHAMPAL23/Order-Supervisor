@@ -136,7 +136,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={<Activity className="w-4 h-4 text-emerald-400" />}
-            label="Active Runs"
+            label="Ongoing Runs"
             value={stats.active}
             color="bg-emerald-500/10"
           />
@@ -177,7 +177,7 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-zinc-300">
-              Active Runs
+              Ongoing Runs
             </h2>
             <div className="flex items-center gap-2">
               <button
@@ -220,7 +220,7 @@ export default function DashboardPage() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
               <EmptyState
                 icon={<Activity className="w-5 h-5" />}
-                title="No active runs"
+                title="No ongoing runs"
                 description="Start an order to begin supervising it."
                 action={
                   <Link href="/runs/new">

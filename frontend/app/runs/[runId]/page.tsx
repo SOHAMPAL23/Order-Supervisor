@@ -176,7 +176,7 @@ export default function RunDetailPage({
             size="sm"
             icon={<ArrowLeft className="w-4 h-4" />}
           >
-            Active Runs
+            Ongoing Runs
           </Button>
         </Link>
 
